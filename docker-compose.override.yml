@@ -1,0 +1,20 @@
+# Docker Compose override for development
+# This file is automatically loaded by docker-compose for development overrides
+
+version: '3.8'
+
+services:
+  ssh-ai-assistant:
+    # Override for development - mount source code for live editing
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ~/.ssh:/home/appuser/.ssh:ro
+    # Enable development mode
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEVELOPMENT=1
+    # Override command for development
+    command: ["interactive"]
