@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}AI 對話 - SSH AI Assistant{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>
+                    <i class="bi bi-chat-dots"></i>
+                    AI 對話
+                </h1>
+                {% if selected_machine %}
+                <p class="text-muted mb-0">
+                    <i class="bi bi-server"></i>
+                    當前機器: {{ selected_machine.name }} ({{ selected_machine.host }})
+                </p>
+                {% else %}
+                <p class="text-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    尚未選擇機器
+                </p>
+                {% endif %}
+            </div>
+            
+            <div>
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                    返回機器選擇
+                </a>
+                {% if not selected_machine %}
+                <button class="btn btn-primary" onclick="showMachineSelector()">
+                    <i class="bi bi-server"></i>
+                    選擇機器
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Chat Container -->
+        <div class="chat-container" id="chatContainer">
+            <!-- Load existing conversation history -->
+            {% for message in conversation_history %}
+            <div class="message {{ message.message_type }}">
+                {% if message.message_type == 'user' %}
+                    <strong>您:</strong> {{ message.content }}
+                {% elif message.message_type == 'assistant' %}
+                    <strong>AI 助手:</strong> {{ message.content }}
+                    {% if message.metadata and message.metadata.results %}
+                        {% for result in message.metadata.results %}
+                        <div class="command-result">
+                            <strong>$ {{ result.command }}</strong>
+                            {% if result.success %}
+                                {{ result.output }}
+                            {% else %}
+                                <span class="text-danger">錯誤: {{ result.output }}</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% elif message.message_type == 'system' %}
+                    <i class="bi bi-info-circle"></i> {{ message.content }}
+                {% endif %}
+                <div class="text-end">
+                    <small class="text-muted">{{ message.timestamp[:19] }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Input Area -->
+        <div class="mt-3">
+            <div class="input-group">
+                <input type="text" class="form-control" id="messageInput" 
+                       placeholder="輸入您的指令，例如：幫我查看系統資訊" 
+                       {% if not selected_machine %}disabled{% endif %}>
+                <button class="btn btn-primary" type="button" id="sendButton" 
+                        onclick="sendMessage()" {% if not selected_machine %}disabled{% endif %}>
+                    <i class="bi bi-send"></i>
+                    發送
+                </button>
+            </div>
+            
+            {% if not selected_machine %}
+            <div class="alert alert-warning mt-2">
+                <i class="bi bi-exclamation-triangle"></i>
+                請先選擇一台機器才能開始對話
+            </div>
+            {% endif %}
+            
+            <!-- Quick Commands -->
+            <div class="mt-2">
+                <small class="text-muted">快速指令:</small>
+                <div class="btn-group-sm mt-1" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                            onclick="insertQuickCommand('幫我查看系統資訊')" 
+                            {% if not selected_machine %}disabled{% endif %}>
+                        系統資訊
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                            onclick="insertQuickCommand('檢查磁碟使用情況')" 
+                            {% if not selected_machine %}disabled{% endif %}>
+                        磁碟使用
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                            onclick="insertQuickCommand('查看網路狀態')" 
+                            {% if not selected_machine %}disabled{% endif %}>
+                        網路狀態
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                            onclick="insertQuickCommand('檢查系統負載')" 
+                            {% if not selected_machine %}disabled{% endif %}>
+                        系統負載
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Status -->
+<div class="position-fixed bottom-0 end-0 p-3">
+    <div class="toast" id="connectionToast" role="alert">
+        <div class="toast-header">
+            <span class="status-indicator me-2" id="connectionStatus"></span>
+            <strong class="me-auto">連線狀態</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="connectionMessage">
+            正在連接...
+        </div>
+    </div>
+</div>
+
+<!-- Machine Selector Modal -->
+<div class="modal fade" id="machineSelectorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">選擇機器</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="machineSelectorBody">
+                <!-- Content will be loaded by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const sessionId = '{{ session_id }}';
+    let websocket = null;
+    let isConnected = false;
+    
+    // Initialize WebSocket connection
+    function initWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
+        
+        websocket = new WebSocket(wsUrl);
+        
+        websocket.onopen = function(event) {
+            console.log('WebSocket connected');
+            isConnected = true;
+            updateConnectionStatus('online', '已連接');
+        };
+        
+        websocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        };
+        
+        websocket.onclose = function(event) {
+            console.log('WebSocket disconnected');
+            isConnected = false;
+            updateConnectionStatus('offline', '連線中斷');
+            
+            // Try to reconnect after 3 seconds
+            setTimeout(initWebSocket, 3000);
+        };
+        
+        websocket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+            updateConnectionStatus('offline', '連線錯誤');
+        };
+    }
+    
+    function handleWebSocketMessage(data) {
+        switch (data.type) {
+            case 'message_received':
+                // Message acknowledged by server
+                break;
+                
+            case 'ai_response':
+                displayAIResponse(data);
+                break;
+                
+            case 'machine_selected':
+                // Machine was selected, reload page to update UI
+                window.location.reload();
+                break;
+                
+            case 'pong':
+                // Heartbeat response
+                break;
+                
+            default:
+                console.log('Unknown message type:', data.type);
+        }
+    }
+    
+    function displayAIResponse(data) {
+        const chatContainer = document.getElementById('chatContainer');
+        
+        if (data.success) {
+            // Display successful response
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            
+            let content = `<strong>AI 助手:</strong> ${data.summary}`;
+            
+            // Add command results if any
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(result => {
+                    content += `
+                        <div class="command-result">
+                            <strong>$ ${result.command}</strong>
+                            ${result.success ? 
+                                result.output : 
+                                `<span class="text-danger">錯誤: ${result.output}</span>`
+                            }
+                        </div>
+                    `;
+                });
+            }
+            
+            content += `
+                <div class="text-end">
+                    <small class="text-muted">${new Date(data.timestamp).toLocaleString()}</small>
+                </div>
+            `;
+            
+            messageDiv.innerHTML = content;
+            chatContainer.appendChild(messageDiv);
+        } else {
+            // Display error response
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message error';
+            
+            let content = `<strong>錯誤:</strong> ${data.error}`;
+            
+            // Add suggestions if any
+            if (data.suggestions && data.suggestions.length > 0) {
+                content += '<br><br><strong>建議的指令:</strong><ul>';
+                data.suggestions.forEach(suggestion => {
+                    content += `<li>${suggestion}</li>`;
+                });
+                content += '</ul>';
+            }
+            
+            content += `
+                <div class="text-end">
+                    <small class="text-muted">${new Date(data.timestamp).toLocaleString()}</small>
+                </div>
+            `;
+            
+            messageDiv.innerHTML = content;
+            chatContainer.appendChild(messageDiv);
+        }
+        
+        // Scroll to bottom
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+        // Re-enable input
+        document.getElementById('messageInput').disabled = false;
+        document.getElementById('sendButton').disabled = false;
+        document.getElementById('sendButton').innerHTML = '<i class="bi bi-send"></i> 發送';
+    }
+    
+    function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+        
+        if (!message || !isConnected) {
+            return;
+        }
+        
+        // Display user message
+        const chatContainer = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message user';
+        messageDiv.innerHTML = `
+            <strong>您:</strong> ${message}
+            <div class="text-end">
+                <small class="text-muted">${new Date().toLocaleString()}</small>
+            </div>
+        `;
+        chatContainer.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+        // Send message via WebSocket
+        websocket.send(JSON.stringify({
+            type: 'chat_message',
+            message: message
+        }));
+        
+        // Clear input and disable until response
+        input.value = '';
+        input.disabled = true;
+        document.getElementById('sendButton').disabled = true;
+        document.getElementById('sendButton').innerHTML = '<i class="bi bi-hourglass-split"></i> 處理中...';
+    }
+    
+    function insertQuickCommand(command) {
+        document.getElementById('messageInput').value = command;
+        document.getElementById('messageInput').focus();
+    }
+    
+    function updateConnectionStatus(status, message) {
+        const statusIndicator = document.getElementById('connectionStatus');
+        const messageElement = document.getElementById('connectionMessage');
+        const toast = document.getElementById('connectionToast');
+        
+        statusIndicator.className = `status-indicator status-${status}`;
+        messageElement.textContent = message;
+        
+        // Show toast
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+    
+    async function showMachineSelector() {
+        const modal = new bootstrap.Modal(document.getElementById('machineSelectorModal'));
+        const body = document.getElementById('machineSelectorBody');
+        
+        // Show loading
+        body.innerHTML = showLoading().outerHTML;
+        modal.show();
+        
+        try {
+            // Fetch available machines
+            const response = await fetch('/api/machines');
+            const machines = await response.json();
+            
+            if (machines.length === 0) {
+                body.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="bi bi-server" style="font-size: 3rem; color: #6c757d;"></i>
+                        <h5 class="mt-3 text-muted">沒有可用的機器</h5>
+                        <p class="text-muted">請先添加機器配置</p>
+                        <button class="btn btn-primary" onclick="showMachineModal(); modal.hide();">
+                            <i class="bi bi-plus-circle"></i>
+                            新增機器
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Display machines
+            let content = '<div class="row">';
+            machines.forEach(machine => {
+                content += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card machine-card" onclick="selectMachineInChat('${machine.id}')">
+                            <div class="card-body">
+                                <h6 class="card-title">${machine.name}</h6>
+                                <p class="card-text">
+                                    <small class="text-muted">
+                                        <i class="bi bi-hdd-network"></i>
+                                        ${machine.host}:${machine.port}
+                                    </small>
+                                </p>
+                                ${machine.description ? `<p class="card-text">${machine.description}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            content += '</div>';
+            
+            body.innerHTML = content;
+            
+        } catch (error) {
+            body.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle"></i>
+                    載入機器列表失敗: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    async function selectMachineInChat(machineId) {
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}/select-machine/${machineId}`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                // Close modal and reload page
+                const modal = bootstrap.Modal.getInstance(document.getElementById('machineSelectorModal'));
+                modal.hide();
+                window.location.reload();
+            } else {
+                const error = await response.json();
+                alert('選擇機器失敗: ' + error.detail);
+            }
+        } catch (error) {
+            alert('選擇機器時發生錯誤: ' + error.message);
+        }
+    }
+    
+    // Handle Enter key in message input
+    document.getElementById('messageInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    // Initialize WebSocket when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        initWebSocket();
+        
+        // Scroll chat container to bottom
+        const chatContainer = document.getElementById('chatContainer');
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
+    
+    // Heartbeat to keep connection alive
+    setInterval(function() {
+        if (isConnected && websocket) {
+            websocket.send(JSON.stringify({
+                type: 'ping'
+            }));
+        }
+    }, 30000); // Every 30 seconds
+</script>
+{% endblock %}

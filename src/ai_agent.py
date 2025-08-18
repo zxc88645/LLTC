@@ -9,6 +9,7 @@ from .models import MachineConfig, CommandResult, UserIntent, ConversationContex
 from .machine_manager import MachineManager
 from .ssh_manager import SSHManager
 from .command_interpreter import CommandInterpreter
+from .db_service import DatabaseService
 
 
 logger = logging.getLogger(__name__)
@@ -21,17 +22,17 @@ class AIAgent:
         self.machine_manager = MachineManager()
         self.ssh_manager = SSHManager()
         self.command_interpreter = CommandInterpreter()
-        self.conversations: Dict[str, ConversationContext] = {}
+        self.db_service = DatabaseService()
     
     def create_session(self) -> str:
         """Create a new conversation session."""
         session_id = str(uuid.uuid4())
-        self.conversations[session_id] = ConversationContext(session_id=session_id)
+        self.db_service.create_session(session_id)
         return session_id
     
     def get_session(self, session_id: str) -> Optional[ConversationContext]:
         """Get conversation context for a session."""
-        return self.conversations.get(session_id)
+        return self.db_service.get_session(session_id)
     
     def select_machine(self, session_id: str, machine_id: str) -> Dict[str, Any]:
         """Select a machine for the current session."""
@@ -47,8 +48,17 @@ class AIAgent:
         if not self.ssh_manager.test_connection(machine):
             return {"success": False, "error": "Cannot connect to machine"}
         
-        context.selected_machine = machine_id
-        context.last_activity = datetime.now()
+        # Update session with selected machine
+        success = self.db_service.update_session_machine(session_id, machine_id)
+        if not success:
+            return {"success": False, "error": "Failed to update session"}
+        
+        # Add system message about machine selection
+        self.db_service.add_message(
+            session_id, 
+            "system", 
+            f"Selected machine: {machine.name} ({machine.host})"
+        )
         
         return {
             "success": True,
@@ -73,38 +83,47 @@ class AIAgent:
         if not machine:
             return {"success": False, "error": "Selected machine not found"}
         
+        # Add user message to conversation
+        self.db_service.add_message(session_id, "user", user_input)
+        
         # Interpret the command
         intent = self.command_interpreter.interpret_command(user_input)
         
         if intent.confidence < 0.5:
             suggestions = self.command_interpreter.get_command_suggestions(user_input)
+            error_msg = "I don't understand that command."
+            
+            # Add assistant response
+            self.db_service.add_message(session_id, "assistant", error_msg, {
+                "suggestions": suggestions,
+                "available_commands": self.command_interpreter.get_available_intents()
+            })
+            
             return {
                 "success": False,
-                "error": "I don't understand that command.",
+                "error": error_msg,
                 "suggestions": suggestions,
                 "available_commands": self.command_interpreter.get_available_intents()
             }
         
         # Execute the command(s)
-        results = self._execute_intent(machine, intent)
+        results = self._execute_intent(machine, intent, session_id)
         
-        # Update conversation history
-        context.conversation_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "user_input": user_input,
+        # Generate summary and add assistant response
+        summary = self._generate_summary(intent, results)
+        self.db_service.add_message(session_id, "assistant", summary, {
             "intent": intent.dict(),
-            "results": [result.dict() for result in results]
+            "results": [self._format_result(result) for result in results]
         })
-        context.last_activity = datetime.now()
         
         return {
             "success": True,
             "intent": intent.dict(),
             "results": [self._format_result(result) for result in results],
-            "summary": self._generate_summary(intent, results)
+            "summary": summary
         }
     
-    def _execute_intent(self, machine: MachineConfig, intent: UserIntent) -> List[CommandResult]:
+    def _execute_intent(self, machine: MachineConfig, intent: UserIntent, session_id: str) -> List[CommandResult]:
         """Execute commands based on the interpreted intent."""
         commands = intent.parameters.get('commands', [])
         results = []
@@ -114,28 +133,63 @@ class AIAgent:
                 result = self.ssh_manager.execute_command(machine, command)
                 results.append(result)
                 
+                # Record command execution in database
+                self.db_service.record_command_execution(
+                    session_id=session_id,
+                    machine_id=machine.id,
+                    command=result.command,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    exit_code=result.exit_code,
+                    execution_time=result.execution_time
+                )
+                
                 # For some commands, we might want to stop on failure
                 if intent.action == 'install_cuda' and not result.success:
                     # For CUDA installation, if nvidia-smi fails, skip the rest
                     if command == 'nvidia-smi' and result.exit_code != 0:
-                        results.append(CommandResult(
+                        skip_result = CommandResult(
                             command="CUDA installation skipped",
                             stdout="NVIDIA driver not found. Please install NVIDIA driver first.",
                             stderr="",
                             exit_code=0,
                             execution_time=0.0
-                        ))
+                        )
+                        results.append(skip_result)
+                        
+                        # Record the skip message
+                        self.db_service.record_command_execution(
+                            session_id=session_id,
+                            machine_id=machine.id,
+                            command=skip_result.command,
+                            stdout=skip_result.stdout,
+                            stderr=skip_result.stderr,
+                            exit_code=skip_result.exit_code,
+                            execution_time=skip_result.execution_time
+                        )
                         break
                 
             except Exception as e:
                 logger.error(f"Error executing command '{command}': {e}")
-                results.append(CommandResult(
+                error_result = CommandResult(
                     command=command,
                     stdout="",
                     stderr=str(e),
                     exit_code=-1,
                     execution_time=0.0
-                ))
+                )
+                results.append(error_result)
+                
+                # Record the error
+                self.db_service.record_command_execution(
+                    session_id=session_id,
+                    machine_id=machine.id,
+                    command=error_result.command,
+                    stdout=error_result.stdout,
+                    stderr=error_result.stderr,
+                    exit_code=error_result.exit_code,
+                    execution_time=error_result.execution_time
+                )
         
         return results
     
