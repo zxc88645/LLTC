@@ -27,6 +27,33 @@
 
 ## 安裝
 
+### 方法一：使用 Docker（推薦）
+
+> 📖 詳細的 Docker 部署說明請參考 [DOCKER.md](./DOCKER.md)
+
+1. 確保已安裝 Docker 和 Docker Compose
+
+2. 使用 Docker Compose 啟動：
+```bash
+docker-compose up -d
+```
+
+3. 進入互動模式：
+```bash
+docker-compose exec ssh-ai-assistant python main.py interactive
+```
+
+或者直接運行：
+```bash
+docker run -it --rm \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/logs:/app/logs \
+  -v ~/.ssh:/home/appuser/.ssh:ro \
+  ssh-ai-assistant
+```
+
+### 方法二：本地安裝
+
 1. 安裝依賴套件：
 ```bash
 pip install -r requirements.txt
@@ -39,17 +66,55 @@ python main.py interactive
 
 ## 使用方法
 
-### 啟動互動模式
+### Docker 使用方式
+
+#### 啟動互動模式
+```bash
+# 使用 Docker Compose
+docker-compose exec ssh-ai-assistant python main.py interactive
+
+# 或直接使用 Docker
+docker run -it --rm \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/logs:/app/logs \
+  ssh-ai-assistant interactive
+```
+
+#### 添加機器
+```bash
+# 使用 Docker Compose
+docker-compose exec ssh-ai-assistant python main.py add-machine --name "我的伺服器" --host "192.168.1.100" --username "admin"
+
+# 或直接使用 Docker
+docker run -it --rm \
+  -v $(pwd)/config:/app/config \
+  ssh-ai-assistant add-machine --name "我的伺服器" --host "192.168.1.100" --username "admin"
+```
+
+#### 列出所有機器
+```bash
+# 使用 Docker Compose
+docker-compose exec ssh-ai-assistant python main.py machines
+
+# 或直接使用 Docker
+docker run -it --rm \
+  -v $(pwd)/config:/app/config \
+  ssh-ai-assistant machines
+```
+
+### 本地使用方式
+
+#### 啟動互動模式
 ```bash
 python main.py interactive
 ```
 
-### 添加機器
+#### 添加機器
 ```bash
 python main.py add-machine --name "我的伺服器" --host "192.168.1.100" --username "admin"
 ```
 
-### 列出所有機器
+#### 列出所有機器
 ```bash
 python main.py machines
 ```
@@ -104,9 +169,41 @@ tests/                   # 單元測試
 
 ## 開發
 
-### 執行測試
+### 本地開發
+
+#### 執行測試
 ```bash
 python -m pytest tests/ -v
+```
+
+### Docker 開發
+
+#### 建置 Docker 映像
+```bash
+docker build -t ssh-ai-assistant .
+```
+
+#### 使用 Docker Compose 進行開發
+```bash
+# 啟動服務
+docker-compose up -d
+
+# 查看日誌
+docker-compose logs -f
+
+# 進入容器進行調試
+docker-compose exec ssh-ai-assistant bash
+
+# 執行測試
+docker-compose exec ssh-ai-assistant python -m pytest tests/ -v
+
+# 停止服務
+docker-compose down
+```
+
+#### 重新建置並啟動
+```bash
+docker-compose up --build -d
 ```
 
 ### 添加新的指令模式
