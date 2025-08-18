@@ -51,7 +51,7 @@ class ConversationMessage(Base):
     session_id = Column(String, ForeignKey("conversation_sessions.id"), nullable=False)
     message_type = Column(String, nullable=False)  # 'user', 'assistant', 'system'
     content = Column(Text, nullable=False)
-    metadata = Column(Text, nullable=True)  # JSON string for additional data
+    extra_data = Column(Text, nullable=True)  # JSON string for additional data
     timestamp = Column(DateTime, default=datetime.now)
     
     # Relationships
