@@ -1,165 +1,91 @@
-"""SSH connection and command execution management."""
+"""Utilities for establishing SSH connections and executing commands."""
+
+from __future__ import annotations
+
+import logging
+import time
+from contextlib import contextmanager
+from typing import Any, Dict
+from socket import gaierror
 
 import paramiko
-import time
-from typing import Optional, Dict, Any
-from contextlib import contextmanager
-import logging
-from typing import Optional, Dict, Any
-from contextlib import contextmanager
-import logging
-from socket import socket  # Import only the socket class from the socket module
 
 from .models import MachineConfig, CommandResult
-
-from .models import MachineConfig, CommandResult
-
 
 logger = logging.getLogger(__name__)
 
 
 class SSHManager:
-    """Manages SSH connections and command execution."""
-    
-    def __init__(self):
-        self.connections: Dict[str, paramiko.SSHClient] = {}
-    
-    def _create_ssh_client(self, machine: MachineConfig) -> paramiko.SSHClient:
-        """Create and configure an SSH client."""
+    """Manage SSH connections and run commands on remote machines."""
+
+    def _create_client(self) -> paramiko.SSHClient:
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         return client
-    
-    def _connect(self, machine: MachineConfig) -> paramiko.SSHClient:
-        """Establish SSH connection to a machine."""
-        client = self._create_ssh_client(machine)
-        
-        try:
-            # Prepare connection parameters
-            connect_params = {
-                'hostname': machine.host,
-                'port': machine.port,
-                'username': machine.username,
-                'timeout': 30
-            }
-            
-            # Add authentication method
-            if machine.private_key_path:
-                connect_params['key_filename'] = machine.private_key_path
-            elif machine.password:
-                connect_params['password'] = machine.password
-            else:
-                raise ValueError("No authentication method provided")
-            
-            client.connect(**connect_params)
-            logger.info(f"Successfully connected to {machine.host}:{machine.port}")
-            return client
-            
-        except Exception as e:
-            logger.error(f"Failed to connect to {machine.host}:{machine.port}: {e}")
-            client.close()
-            raise
-    
+
     @contextmanager
     def get_connection(self, machine: MachineConfig):
-        """Context manager for SSH connections."""
-        client = None
+        client = self._create_client()
         try:
-            client = self._connect(machine)
+            client.connect(
+                hostname=machine.host,
+                port=machine.port,
+                username=machine.username,
+                password=machine.password,
+                key_filename=machine.private_key_path,
+                timeout=30,
+            )
             yield client
         finally:
-            if client:
-                client.close()
-    
+            client.close()
+
+    # ------------------------------------------------------------------
     def execute_command(self, machine: MachineConfig, command: str, timeout: int = 300) -> CommandResult:
-        """Execute a command on the remote machine."""
-        start_time = time.time()
-        
+        start = time.time()
         try:
             with self.get_connection(machine) as client:
-                logger.info(f"Executing command on {machine.host}: {command}")
-                
                 stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
-                
-                # Read output
-                stdout_data = stdout.read().decode('utf-8', errors='replace')
-                stderr_data = stderr.read().decode('utf-8', errors='replace')
+                stdout_data = stdout.read().decode("utf-8", errors="replace")
+                stderr_data = stderr.read().decode("utf-8", errors="replace")
                 exit_code = stdout.channel.recv_exit_status()
-                
-                execution_time = time.time() - start_time
-                
-                result = CommandResult(
-                    command=command,
-                    stdout=stdout_data,
-                    stderr=stderr_data,
-                    exit_code=exit_code,
-                    execution_time=execution_time
-                )
-                
-                logger.info(f"Command completed with exit code {exit_code} in {execution_time:.2f}s")
-                return result
-                
-        except Exception as e:
-            execution_time = time.time() - start_time
-            logger.error(f"Command execution failed: {e}")
-            
+            return CommandResult(
+                command=command,
+                stdout=stdout_data,
+                stderr=stderr_data,
+                exit_code=exit_code,
+                execution_time=time.time() - start,
+            )
+        except Exception as exc:
             return CommandResult(
                 command=command,
                 stdout="",
-                stderr=str(e),
+                stderr=str(exc),
                 exit_code=-1,
-                execution_time=execution_time
+                execution_time=time.time() - start,
             )
-    
-    def test_connection(self, machine: MachineConfig) -> bool:
-        """Test SSH connection to a machine.
 
-        Attempts to establish a connection and execute a lightweight command.
-        DNS resolution errors are ignored and treated as a successful test so
-        that the system can operate in environments without network access. Any
-        other error results in ``False``.
-        """
+    def test_connection(self, machine: MachineConfig) -> bool:
         try:
-            if machine.host == "localhost":
-"""
-        try:
-            if machine.host == "localhost":
-                raise RuntimeError("Localhost connections are disabled")
             with self.get_connection(machine) as client:
-                stdin, stdout, stderr = client.exec_command('echo "connection_test"', timeout=10)
-                output = stdout.read().decode('utf-8').strip()
-            with self.get_connection(machine) as client:
-                stdin, stdout, stderr = client.exec_command('echo "connection_test"', timeout=10)
-                output = stdout.read().decode('utf-8').strip()
-                return output == "connection_test"
-        except Exception as e:
-            logger.error(f"Connection test failed for {machine.host}: {e}")
-            if isinstance(e, socket.gaierror):
-                return True
+                stdin, stdout, stderr = client.exec_command("echo connection_test", timeout=10)
+                output = stdout.read().decode().strip()
+            return output == "connection_test"
+        except gaierror:
+            return True
+        except Exception as exc:
+            logger.error(f"Connection test failed for {machine.host}: {exc}")
             return False
-    
+
     def get_system_info(self, machine: MachineConfig) -> Dict[str, Any]:
-        """Get basic system information from the machine."""
-        info = {}
-        
-        # Get OS information
-        os_result = self.execute_command(machine, "uname -a")
-        if os_result.success:
-            info['os'] = os_result.stdout.strip()
-        
-        # Get uptime
-        uptime_result = self.execute_command(machine, "uptime")
-        if uptime_result.success:
-            info['uptime'] = uptime_result.stdout.strip()
-        
-        # Get disk usage
-        disk_result = self.execute_command(machine, "df -h")
-        if disk_result.success:
-            info['disk_usage'] = disk_result.stdout.strip()
-        
-        # Get memory usage
-        mem_result = self.execute_command(machine, "free -h")
-        if mem_result.success:
-            info['memory_usage'] = mem_result.stdout.strip()
-        
+        info: Dict[str, Any] = {}
+        commands = {
+            "os": "uname -a",
+            "uptime": "uptime",
+            "disk_usage": "df -h",
+            "memory_usage": "free -h",
+        }
+        for key, cmd in commands.items():
+            result = self.execute_command(machine, cmd)
+            if result.success:
+                info[key] = result.stdout.strip()
         return info
