@@ -194,13 +194,8 @@ def mock_ssh_client():
         
         mock_stdout.read.return_value = b"test output\n"
         mock_stderr.read.return_value = b""
-mock_stdout.read.return_value = b"test output
-"
-        mock_stderr.read.return_value = b""
         mock_stdout.channel = Mock()
         mock_stdout.channel.recv_exit_status.return_value = 0
-        
-        mock_instance.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
         
         mock_instance.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
         

@@ -15,7 +15,7 @@ class TestMachineConfig:
             name="Test Machine",
             host="192.168.1.100",
             username="testuser",
-            password="testpass"
+            password="testpass",
         )
         
         assert config.id == "test-machine"
@@ -32,7 +32,7 @@ class TestMachineConfig:
             name="Key Machine",
             host="example.com",
             username="keyuser",
-            private_key_path="/path/to/key"
+            private_key_path="/path/to/key",
         )
         
         assert config.private_key_path == "/path/to/key"
@@ -49,7 +49,7 @@ class TestCommandResult:
             stdout="hello\n",
             stderr="",
             exit_code=0,
-            execution_time=0.1
+            execution_time=0.1,
         )
         
         assert result.success is True
@@ -63,7 +63,7 @@ class TestCommandResult:
             stdout="",
             stderr="command not found",
             exit_code=127,
-            execution_time=0.05
+            execution_time=0.05,
         )
         
         assert result.success is False
@@ -79,7 +79,7 @@ class TestUserIntent:
             action="check_os_version",
             parameters={"commands": ["uname -a"]},
             confidence=0.9,
-            original_text="check os version"
+            original_text="check os version",
         )
         
         assert intent.action == "check_os_version"
