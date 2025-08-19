@@ -309,7 +309,22 @@ def pytest_collection_modifyitems(config, items):
         # Add database marker to database-related tests
         if any(keyword in item.name.lower() 
                for keyword in ['database', 'db', 'storage', 'persistence']):
+# Add slow marker to tests that might be slow
+        if any(keyword in item.name.lower() 
+               for keyword in ['long_running', 'time_consuming', 'heavy_computation']):
+            item.add_marker(pytest.mark.slow)
+        
+        # Add ssh marker to SSH-related tests
+        if any(keyword in item.name.lower() 
+               for keyword in ['ssh', 'remote_execution', 'secure_shell']):
+            item.add_marker(pytest.mark.ssh)
+        
+        # Add database marker to database-related tests
+        if any(keyword in item.name.lower() 
+               for keyword in ['db', 'sql', 'nosql', 'orm']):
             item.add_marker(pytest.mark.database)
+        
+        # Add web marker to web-related tests
         
         # Add web marker to web-related tests
         if any(keyword in item.name.lower() 
