@@ -344,7 +344,20 @@ def performance_monitor():
             self.end_time = time.time()
             self.monitoring = False
             if self.monitor_thread:
-                self.monitor_thread.join()
+self.start_time = time.time()
+            self.monitoring = True
+            self.monitor_thread = threading.Thread(target=self._monitor_memory)
+            self.monitor_thread.daemon = True
+            self.monitor_thread.start()
+        
+        def stop(self):
+            self.end_time = time.time()
+            self.monitoring = False
+            if self.monitor_thread:
+                self.monitor_thread.join(timeout=1.0)
+        
+        def _monitor_memory(self):
+            process = psutil.Process()
         
         def _monitor_memory(self):
             process = psutil.Process()
