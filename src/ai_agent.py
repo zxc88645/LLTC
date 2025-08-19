@@ -5,7 +5,54 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
 import os
+"""AI Agent that orchestrates SSH operations based on natural language input."""
+
+import uuid
+from typing import Optional, Dict, Any, List
+from datetime import datetime
+import logging
+import os
+from tempfile import mkdtemp  # Import specific function from tempfile
+
+from .models import MachineConfig, CommandResult, UserIntent, ConversationContext
+from .machine_manager import MachineManager
+from .ssh_manager import SSHManager
+from .command_interpreter import CommandInterpreter
+from .db_service import DatabaseService
+from .database import init_database
+
+
+logger = logging.getLogger(__name__)
+
+
+class AIAgent:
+    """Main AI agent that handles user interactions and SSH operations."""
+    
+    def __init__(self, config_dir: Optional[str] = None):
+        if config_dir is None:
+            config_dir = mkdtemp()
+        os.environ["DATABASE_DIR"] = config_dir
+        init_database()
+
+from .models import MachineConfig, CommandResult, UserIntent, ConversationContext
+from .machine_manager import MachineManager
+from .ssh_manager import SSHManager
+from .command_interpreter import CommandInterpreter
+from .db_service import DatabaseService
+from .database import init_database
+
+
+logger = logging.getLogger(__name__)
+
+
+class AIAgent:
+    """Main AI agent that handles user interactions and SSH operations."""
+    
+    def __init__(self, config_dir: Optional[str] = None):
+        if config_dir is None:
+import os
 import tempfile
+import atexit  # Import atexit for cleanup
 
 from .models import MachineConfig, CommandResult, UserIntent, ConversationContext
 from .machine_manager import MachineManager
@@ -24,7 +71,37 @@ class AIAgent:
     def __init__(self, config_dir: Optional[str] = None):
         if config_dir is None:
             config_dir = tempfile.mkdtemp()
+            atexit.register(self.cleanup, config_dir)  # Register cleanup function
         os.environ["DATABASE_DIR"] = config_dir
+        init_database()
+        self.machine_manager = MachineManager(config_dir=config_dir)
+        self.ssh_manager = SSHManager()
+        self.command_interpreter = CommandInterpreter()
+        self.db_service = DatabaseService(config_dir)
+    
+    def cleanup(self, temp_dir):
+        """Clean up temporary directory."""
+        if os.path.exists(temp_dir):
+            import shutil
+            shutil.rmtree(temp_dir)
+    
+    def create_session(self) -> str:
+        """Create a new conversation session."""
+        session_id = str(uuid.uuid4())
+        self.db_service.create_session(session_id)
+        return session_id
+    
+    def get_session(self, session_id: str) -> Optional[ConversationContext]:
+        """Get conversation context for a session."""
+        return self.db_service.get_session(session_id)
+def __init__(self, config_dir: Optional[str] = None):
+        if config_dir is None:
+            config_dir = tempfile.mkdtemp()
+        # Use os.path.join for safe path construction
+        os.environ["DATABASE_DIR"] = os.path.join(os.getcwd(), config_dir)
+        init_database()
+        self.machine_manager = MachineManager(config_dir=config_dir)
+        self.ssh_manager = SSHManager()
         init_database()
         self.machine_manager = MachineManager(config_dir=config_dir)
         self.ssh_manager = SSHManager()

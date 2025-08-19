@@ -60,7 +60,21 @@ def get_db():
 
 def init_database():
     """Initialize database tables using current environment settings."""
-    global engine
+# Import the globalSetting module to manage global state
+# This allows for safer management of shared variables across modules
+import globalSetting
+
+def init_database():
+    """Initialize database tables using current environment settings."""
+    # Recreate engine in case environment changed
+    globalSetting.engine.dispose()
+    globalSetting.engine = _create_engine()
+    SessionLocal.configure(bind=globalSetting.engine)
+
+    Base.metadata.create_all(bind=globalSetting.engine)
+
+    # Set proper permissions on database file
+    db_file = _get_database_dir() / "ssh_ai.db"
     # Recreate engine in case environment changed
     engine.dispose()
     engine = _create_engine()

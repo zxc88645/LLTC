@@ -14,7 +14,12 @@ class MachineManager:
     """Manages SSH machine configurations using SQLite database."""
     
     def __init__(self, config_dir: str = "config"):
-        os.environ["DATABASE_DIR"] = config_dir
+def __init__(self, config_dir: str = "config"):
+        # import os
+        # Use os.path.join for safe path construction
+        os.environ["DATABASE_DIR"] = os.path.join(os.getcwd(), config_dir)
+        init_database()
+        self.db_service = DatabaseService(config_dir)
         init_database()
         self.db_service = DatabaseService(config_dir)
 

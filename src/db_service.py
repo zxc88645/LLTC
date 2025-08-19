@@ -201,7 +201,91 @@ class DatabaseService:
                         "message_type": msg.message_type,
                         "content": msg.content
                     }
+# Import logging at the top of the file
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+                return [self._machine_to_config(machine) for machine in machines]
+        except Exception as e:
+            logger.error(f"Error searching machines: {e}")
+            return []
+    
+    def create_session(self, session_id: str) -> bool:
+        """Create a new conversation session."""
+        try:
+            with SessionLocal() as db:
+                session = ConversationSession(
+                    id=session_id,
+                    created_at=datetime.now(),
+                    last_activity=datetime.now(),
+                    is_active=True
+                )
+                db.add(session)
+                db.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error creating session: {e}")
+            return False
+    
+    def get_session(self, session_id: str) -> Optional[ConversationContext]:
+        """Get conversation session."""
+        try:
+            with SessionLocal() as db:
+                session = db.query(ConversationSession).filter(
+                    ConversationSession.id == session_id
+                ).first()
+                
+                if not session:
+                    return None
+                
+                # Get conversation history
+                messages = db.query(ConversationMessage).filter(
+                    ConversationMessage.session_id == session_id
+                ).order_by(ConversationMessage.timestamp).all()
+                
+                conversation_history = []
+                for msg in messages:
+                    history_item = {
+                        "timestamp": msg.timestamp.isoformat(),
+                        "message_type": msg.message_type,
+                        "content": msg.content
+                    }
                     if msg.extra_data:
+                        history_item["metadata"] = json.loads(msg.extra_data)
+                    conversation_history.append(history_item)
+                
+                return ConversationContext(
+                    session_id=session.id,
+                    selected_machine=session.machine_id,
+                    conversation_history=conversation_history,
+                    created_at=session.created_at,
+                    last_activity=session.last_activity
+                )
+        except Exception as e:
+            logger.error(f"Error getting session: {e}")
+            return None
+    
+    def update_session_machine(self, session_id: str, machine_id: str) -> bool:
+        """Update the selected machine for a session."""
+        try:
+            with SessionLocal() as db:
+                session = db.query(ConversationSession).filter(
+                    ConversationSession.id == session_id
+                ).first()
+                
+                if not session:
+                    return False
+                
+                session.machine_id = machine_id
+                session.last_activity = datetime.now()
+                db.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error updating session machine: {e}")
+            return False
                         history_item["metadata"] = json.loads(msg.extra_data)
                     conversation_history.append(history_item)
                 
@@ -243,11 +327,89 @@ class DatabaseService:
                     session_id=session_id,
                     message_type=message_type,
                     content=content,
+with SessionLocal() as db:
+                session = db.query(ConversationSession).filter(
+                    ConversationSession.id == session_id
+                ).first()
+                
+                if not session:
+                    return False
+                
+                session.machine_id = machine_id
+                session.last_activity = datetime.now()
+                db.commit()
+                return True
+        except Exception as e:
+            # import logging
+            logging.error(f"Error updating session machine: {e}")
+            return False
+    
+    def add_message(self, session_id: str, message_type: str, content: str, metadata: Dict = None) -> bool:
+        """Add a message to conversation history."""
+        try:
+            with SessionLocal() as db:
+                message = ConversationMessage(
+                    session_id=session_id,
+                    message_type=message_type,
+                    content=content,
                     extra_data=json.dumps(metadata) if metadata else None,
                     timestamp=datetime.now()
                 )
                 db.add(message)
 
+                # Update session last activity
+                session = db.query(ConversationSession).filter(
+                    ConversationSession.id == session_id
+                ).first()
+                if session:
+                    session.last_activity = datetime.now()
+
+                db.commit()
+                return True
+        except Exception as e:
+            # import logging
+            logging.error(f"Error adding message: {e}")
+            return False
+    
+    def record_command_execution(self, session_id: str, machine_id: str, 
+                               command: str, stdout: str, stderr: str, 
+                               exit_code: int, execution_time: float) -> bool:
+        """Record command execution in database."""
+        try:
+            with SessionLocal() as db:
+                execution = CommandExecution(
+                    session_id=session_id,
+                    machine_id=machine_id,
+                    command=command,
+                    stdout=stdout,
+                    timestamp=datetime.now()
+                )
+                db.add(message)
+def add_message(self, session_id: str, message_type: str, content: str, metadata: Dict = None) -> bool:
+        """Add a message to conversation history."""
+        try:
+            with SessionLocal() as db:
+                current_time = datetime.now()
+                message = ConversationMessage(
+                    session_id=session_id,
+                    message_type=message_type,
+                    content=content,
+                    extra_data=json.dumps(metadata) if metadata else None,
+                    timestamp=current_time
+                )
+                db.add(message)
+
+                # Update session last activity
+                session = db.query(ConversationSession).filter(
+                    ConversationSession.id == session_id
+                ).first()
+                if session:
+                    session.last_activity = current_time
+
+                db.commit()
+                return True
+        except Exception as e:
+            print(f"Error adding message: {e}")
                 # Update session last activity
                 session = db.query(ConversationSession).filter(
                     ConversationSession.id == session_id

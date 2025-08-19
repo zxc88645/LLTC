@@ -5,7 +5,12 @@ import time
 from typing import Optional, Dict, Any
 from contextlib import contextmanager
 import logging
-import socket
+from typing import Optional, Dict, Any
+from contextlib import contextmanager
+import logging
+from socket import socket  # Import only the socket class from the socket module
+
+from .models import MachineConfig, CommandResult
 
 from .models import MachineConfig, CommandResult
 
@@ -116,7 +121,13 @@ class SSHManager:
         """
         try:
             if machine.host == "localhost":
-                raise Exception("Localhost connections are disabled")
+"""
+        try:
+            if machine.host == "localhost":
+                raise RuntimeError("Localhost connections are disabled")
+            with self.get_connection(machine) as client:
+                stdin, stdout, stderr = client.exec_command('echo "connection_test"', timeout=10)
+                output = stdout.read().decode('utf-8').strip()
             with self.get_connection(machine) as client:
                 stdin, stdout, stderr = client.exec_command('echo "connection_test"', timeout=10)
                 output = stdout.read().decode('utf-8').strip()
