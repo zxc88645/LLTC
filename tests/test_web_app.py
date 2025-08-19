@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 # Set up test environment
-os.environ['DATABASE_URL'] = 'sqlite:///test.db'
+os.environ["DATABASE_URL"] = "sqlite:///test.db"
 
 from src.web_app import app
 from src.database import init_database, get_database_path
@@ -20,11 +20,11 @@ def client():
     # Use temporary database for testing
     with tempfile.TemporaryDirectory() as temp_dir:
         # Set database path to temp directory
-        os.environ['DATABASE_DIR'] = temp_dir
-        
+        os.environ["DATABASE_DIR"] = temp_dir
+
         # Initialize test database
         init_database()
-        
+
         # Create test client
         with TestClient(app) as test_client:
             yield test_client
@@ -39,30 +39,27 @@ def sample_machine():
         "port": 22,
         "username": "testuser",
         "password": "testpass",
-        "description": "Test machine for unit tests"
+        "description": "Test machine for unit tests",
     }
 
 
 class TestWebApp:
     """Test cases for web application."""
-    
+
     def test_health_check(self, client):
         """Test health check endpoint."""
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] in ["healthy", "degraded"]  # Allow degraded status
+        assert data["status"] == "healthy"
         assert "timestamp" in data
-        # Check if components are included in enhanced health check
-        if "components" in data:
-            assert isinstance(data["components"], dict)
-    
+
     def test_home_page(self, client):
         """Test home page renders."""
         response = client.get("/")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-    
+
     def test_create_session(self, client):
         """Test session creation."""
         response = client.post("/api/sessions")
@@ -70,13 +67,13 @@ class TestWebApp:
         data = response.json()
         assert "session_id" in data
         assert len(data["session_id"]) > 0
-    
+
     def test_get_session(self, client):
         """Test getting session information."""
         # Create session first
         create_response = client.post("/api/sessions")
         session_id = create_response.json()["session_id"]
-        
+
         # Get session info
         response = client.get(f"/api/sessions/{session_id}")
         assert response.status_code == 200
@@ -86,12 +83,12 @@ class TestWebApp:
         assert "created_at" in data
         assert "last_activity" in data
         assert "conversation_history" in data
-    
+
     def test_get_nonexistent_session(self, client):
         """Test getting non-existent session."""
         response = client.get("/api/sessions/nonexistent")
         assert response.status_code == 404
-    
+
     def test_list_machines_empty(self, client):
         """Test listing machines when none exist."""
         response = client.get("/api/machines")
@@ -99,7 +96,7 @@ class TestWebApp:
         data = response.json()
         assert isinstance(data, list)
         assert len(data) == 0
-    
+
     def test_create_machine(self, client, sample_machine):
         """Test creating a machine configuration."""
         # Note: This will fail connection test, but we're testing the API structure
@@ -108,33 +105,33 @@ class TestWebApp:
         assert response.status_code == 400
         data = response.json()
         assert "detail" in data
-    
+
     def test_create_machine_invalid_data(self, client):
         """Test creating machine with invalid data."""
         invalid_machine = {
             "name": "",  # Empty name should fail validation
-            "host": "localhost"
+            "host": "localhost",
             # Missing required fields
         }
         response = client.post("/api/machines", json=invalid_machine)
         assert response.status_code == 422  # Validation error
-    
+
     def test_get_nonexistent_machine(self, client):
         """Test getting non-existent machine."""
         response = client.get("/api/machines/nonexistent")
         assert response.status_code == 404
-    
+
     def test_update_nonexistent_machine(self, client):
         """Test updating non-existent machine."""
         updates = {"name": "Updated Name"}
         response = client.put("/api/machines/nonexistent", json=updates)
         assert response.status_code == 404
-    
+
     def test_delete_nonexistent_machine(self, client):
         """Test deleting non-existent machine."""
         response = client.delete("/api/machines/nonexistent")
         assert response.status_code == 404
-    
+
     def test_search_machines_empty(self, client):
         """Test searching machines when none exist."""
         response = client.get("/api/machines/search/test")
@@ -142,12 +139,12 @@ class TestWebApp:
         data = response.json()
         assert isinstance(data, list)
         assert len(data) == 0
-    
+
     def test_select_machine_invalid_session(self, client):
         """Test selecting machine with invalid session."""
         response = client.post("/api/sessions/invalid/select-machine/machine123")
         assert response.status_code == 404
-    
+
     def test_chat_page_invalid_session(self, client):
         """Test chat page with invalid session."""
         response = client.get("/chat/invalid")
