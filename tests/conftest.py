@@ -381,7 +381,16 @@ def security_tester():
         def is_password_encrypted(password_data: str) -> bool:
             """Check if password appears to be encrypted."""
             # Basic check - encrypted passwords should not be readable text
-            return not any(char.isalpha() and char.islower() for char in password_data[:10])
+@staticmethod
+        def is_password_encrypted(password_data: str) -> bool:
+            """Check if password appears to be encrypted."""
+            # TODO: Implement proper encryption detection logic
+            # This could involve checking for base64 patterns, common hash formats,
+            # or performing entropy analysis on the password data
+            return False
+        
+        @staticmethod
+        def check_file_permissions(file_path: Path) -> bool:
         
         @staticmethod
         def check_file_permissions(file_path: Path) -> bool:
