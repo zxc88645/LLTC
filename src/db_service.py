@@ -201,8 +201,8 @@ class DatabaseService:
                         "message_type": msg.message_type,
                         "content": msg.content
                     }
-                    if msg.metadata:
-                        history_item["metadata"] = json.loads(msg.metadata)
+                    if msg.extra_data:
+                        history_item["metadata"] = json.loads(msg.extra_data)
                     conversation_history.append(history_item)
                 
                 return ConversationContext(
@@ -243,18 +243,18 @@ class DatabaseService:
                     session_id=session_id,
                     message_type=message_type,
                     content=content,
-                    metadata=json.dumps(metadata) if metadata else None,
+                    extra_data=json.dumps(metadata) if metadata else None,
                     timestamp=datetime.now()
                 )
                 db.add(message)
-                
+
                 # Update session last activity
                 session = db.query(ConversationSession).filter(
                     ConversationSession.id == session_id
                 ).first()
                 if session:
                     session.last_activity = datetime.now()
-                
+
                 db.commit()
                 return True
         except Exception as e:

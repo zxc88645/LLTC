@@ -8,18 +8,32 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import Engine
 import sqlite3
 
-# Database configuration
-DATABASE_DIR = Path("data")
-DATABASE_DIR.mkdir(exist_ok=True)
-DATABASE_URL = f"sqlite:///{DATABASE_DIR}/ssh_ai.db"
 
-# Create engine with proper SQLite configuration
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False  # Set to True for SQL debugging
-)
+def _get_database_dir() -> Path:
+    """Get the directory where the database file is stored."""
+    return Path(os.environ.get("DATABASE_DIR", "data"))
 
+
+def _get_database_url() -> str:
+    """Build the database URL from environment variables."""
+    db_dir = _get_database_dir()
+    db_dir.mkdir(exist_ok=True)
+    if "DATABASE_DIR" in os.environ:
+        return f"sqlite:///{db_dir}/ssh_ai.db"
+    return os.environ.get("DATABASE_URL", f"sqlite:///{db_dir}/ssh_ai.db")
+
+
+def _create_engine():
+    """Create a new SQLAlchemy engine based on current settings."""
+    return create_engine(
+        _get_database_url(),
+        connect_args={"check_same_thread": False},
+        echo=False,  # Set to True for SQL debugging
+    )
+
+
+# Create initial engine and session factory
+engine = _create_engine()
 # Enable foreign key constraints for SQLite
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -45,15 +59,21 @@ def get_db():
 
 
 def init_database():
-    """Initialize database tables."""
+    """Initialize database tables using current environment settings."""
+    global engine
+    # Recreate engine in case environment changed
+    engine.dispose()
+    engine = _create_engine()
+    SessionLocal.configure(bind=engine)
+
     Base.metadata.create_all(bind=engine)
-    
+
     # Set proper permissions on database file
-    db_file = DATABASE_DIR / "ssh_ai.db"
+    db_file = _get_database_dir() / "ssh_ai.db"
     if db_file.exists():
         os.chmod(db_file, 0o600)
 
 
 def get_database_path():
     """Get the path to the database file."""
-    return DATABASE_DIR / "ssh_ai.db"
+    return _get_database_dir() / "ssh_ai.db"

@@ -141,7 +141,8 @@ async def select_machine(session_id: str, machine_id: str):
     """Select a machine for the session."""
     result = ai_agent.select_machine(session_id, machine_id)
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["error"])
+        status_code = 404 if result.get("error") == "Invalid session" else 400
+        raise HTTPException(status_code=status_code, detail=result["error"])
     
     # Notify WebSocket client
     await manager.send_message(session_id, {

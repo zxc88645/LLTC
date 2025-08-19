@@ -4,12 +4,15 @@ import uuid
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
+import os
+import tempfile
 
 from .models import MachineConfig, CommandResult, UserIntent, ConversationContext
 from .machine_manager import MachineManager
 from .ssh_manager import SSHManager
 from .command_interpreter import CommandInterpreter
 from .db_service import DatabaseService
+from .database import init_database
 
 
 logger = logging.getLogger(__name__)
@@ -18,11 +21,15 @@ logger = logging.getLogger(__name__)
 class AIAgent:
     """Main AI agent that handles user interactions and SSH operations."""
     
-    def __init__(self):
-        self.machine_manager = MachineManager()
+    def __init__(self, config_dir: Optional[str] = None):
+        if config_dir is None:
+            config_dir = tempfile.mkdtemp()
+        os.environ["DATABASE_DIR"] = config_dir
+        init_database()
+        self.machine_manager = MachineManager(config_dir=config_dir)
         self.ssh_manager = SSHManager()
         self.command_interpreter = CommandInterpreter()
-        self.db_service = DatabaseService()
+        self.db_service = DatabaseService(config_dir)
     
     def create_session(self) -> str:
         """Create a new conversation session."""
