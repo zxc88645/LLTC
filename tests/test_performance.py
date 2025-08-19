@@ -331,7 +331,46 @@ class TestLoadTesting:
             for op in operations:
                 try:
                     op()
-                except Exception:
+def test_high_frequency_requests(self):
+        """Test handling high frequency requests."""
+        import concurrent.futures
+        import logging  # Import logging module for exception handling
+        
+        # Create session
+        session_id = self.agent.create_session()
+        
+        start_time = time.time()
+        
+        def make_request():
+            # Test various operations
+            operations = [
+                lambda: self.agent.create_session(),
+                lambda: self.agent.list_machines(),
+                lambda: self.agent.get_conversation_history(session_id),
+            ]
+            
+            for op in operations:
+                try:
+                    op()
+                except Exception as e:
+                    logging.exception("Error during operation: %s", e)  # Log exception details
+        
+        # Execute many requests concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            futures = [executor.submit(make_request) for _ in range(100)]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logging.exception("Error in future execution: %s", e)  # Log exception details
+        
+        end_time = time.time()
+        execution_time = end_time - start_time
+        
+        # Performance assertions
+        assert execution_time < 10.0  # Should complete in under 10 seconds
+        requests_per_second = 300 / execution_time  # 100 requests * 3 operations each
+        assert requests_per_second > 30  # Should handle at least 30 requests per second
                     pass  # Ignore errors for load testing
         
         # Execute many requests concurrently
