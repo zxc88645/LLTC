@@ -11,7 +11,7 @@ services:
       - ./tests:/app/tests
       - ./config:/app/config
       - ./logs:/app/logs
-      - ~/.ssh:/home/appuser/.ssh:ro
+      - ${HOME}/.ssh:/home/appuser/.ssh:ro
     # Enable development mode
     environment:
       - PYTHONUNBUFFERED=1

@@ -153,6 +153,8 @@ jobs:
     
     - name: Test Docker Compose
       run: |
+        # Create dummy SSH directory for testing
+        mkdir -p $HOME/.ssh
         docker-compose -f docker-compose.yml -f docker-compose.override.yml config
         docker-compose up -d --build
         sleep 10
@@ -186,7 +188,7 @@ jobs:
     
     - name: Memory profiling
       run: |
-        python -m memory_profiler test_basic.py > memory_profile.txt
+        python memory_profile_test.py > memory_profile.txt
         cat memory_profile.txt
     
     - name: Upload performance reports

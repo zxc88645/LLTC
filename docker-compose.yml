@@ -13,8 +13,8 @@ services:
       - ./logs:/app/logs
       # Mount data directory for SQLite database persistence
       - ./data:/app/data
-      # Optional: mount SSH keys if needed
-      - ~/.ssh:/home/appuser/.ssh:ro
+      # Optional: mount SSH keys if they exist
+      - ${HOME}/.ssh:/home/appuser/.ssh:ro
     environment:
       - PYTHONUNBUFFERED=1
       - HOST=0.0.0.0

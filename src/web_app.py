@@ -4,6 +4,7 @@ import uuid
 import json
 from typing import Dict, List, Optional
 from datetime import datetime
+from pathlib import Path
 import logging
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Request
@@ -303,8 +304,47 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    """Health check endpoint with basic application status."""
+    try:
+        # Check database connectivity
+        from .database import get_db_session
+        with get_db_session() as session:
+            # Simple query to test database
+            session.execute("SELECT 1")
+        
+        # Check AI agent status
+        ai_status = "healthy" if ai_agent else "unavailable"
+        
+        # Check if templates directory exists
+        templates_exist = Path("templates").exists()
+        
+        # Check if static files directory exists
+        static_exist = Path("static").exists()
+        
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "components": {
+                "database": "healthy",
+                "ai_agent": ai_status,
+                "templates": "healthy" if templates_exist else "missing",
+                "static_files": "healthy" if static_exist else "missing"
+            }
+        }
+        
+        # If any component is not healthy, return degraded status
+        if any(status != "healthy" for status in health_status["components"].values()):
+            health_status["status"] = "degraded"
+        
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn
