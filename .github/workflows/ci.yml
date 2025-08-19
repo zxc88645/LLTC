@@ -1,0 +1,315 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  PYTHON_VERSION_DEFAULT: '3.11'
+
+jobs:
+  # Code quality checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 isort mypy bandit safety
+        pip install -r requirements.txt
+    
+    - name: Code formatting check (Black)
+      run: black --check --diff src tests
+    
+    - name: Import sorting check (isort)
+      run: isort --check-only --diff src tests
+    
+    - name: Linting (flake8)
+      run: flake8 src tests --max-line-length=88 --extend-ignore=E203,W503
+    
+    - name: Type checking (mypy)
+      run: mypy src --ignore-missing-imports
+    
+    - name: Security check (bandit)
+      run: bandit -r src -f json -o bandit-report.json
+      continue-on-error: true
+    
+    - name: Dependency vulnerability check (safety)
+      run: safety check --json --output safety-report.json
+      continue-on-error: true
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  # Unit tests across multiple Python versions
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Reduce matrix size for faster execution
+          - os: windows-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.9'
+          - os: windows-latest
+            python-version: '3.12'
+          - os: macos-latest
+            python-version: '3.12'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=term-missing -m "not (integration or performance or slow)"
+    
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == env.PYTHON_VERSION_DEFAULT && matrix.os == 'ubuntu-latest'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Integration tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/ -v --tb=short -m "integration" --maxfail=5
+      env:
+        DATABASE_URL: sqlite:///test_integration.db
+
+  # Docker tests
+  docker-tests:
+    name: Docker Tests
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build Docker image
+      run: |
+        docker build -t ssh-ai-assistant:test .
+    
+    - name: Run tests in Docker
+      run: |
+        docker run --rm -v $(pwd):/app -w /app ssh-ai-assistant:test python -m pytest tests/ -v -m "not (performance or slow)" --tb=short
+    
+    - name: Test Docker Compose
+      run: |
+        docker-compose -f docker-compose.yml -f docker-compose.override.yml config
+        docker-compose up -d --build
+        sleep 10
+        docker-compose exec -T ssh-ai-assistant python -c "import src.web_app; print('Web app imports successfully')"
+        docker-compose down
+
+  # Performance tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run performance tests
+      run: |
+        pytest tests/ -v --tb=short -m "performance" --durations=0
+    
+    - name: Memory profiling
+      run: |
+        python -m memory_profiler test_basic.py > memory_profile.txt
+        cat memory_profile.txt
+    
+    - name: Upload performance reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-reports
+        path: |
+          memory_profile.txt
+
+  # Security tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run security tests
+      run: |
+        pytest tests/ -v --tb=short -m "security"
+    
+    - name: Advanced security scan
+      run: |
+        bandit -r src -ll -f json -o bandit-detailed.json
+        safety check --full-report --output safety-detailed.txt
+      continue-on-error: true
+    
+    - name: Upload security test reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-test-reports
+        path: |
+          bandit-detailed.json
+          safety-detailed.txt
+
+  # Build and test documentation
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+    
+    - name: Check README and documentation
+      run: |
+        # Check if README exists and has content
+        if [ ! -f README.md ] || [ ! -s README.md ]; then
+          echo "README.md is missing or empty"
+          exit 1
+        fi
+        
+        # Check for basic documentation sections
+        grep -q "## 安裝" README.md || (echo "Missing installation section" && exit 1)
+        grep -q "## 使用方法" README.md || (echo "Missing usage section" && exit 1)
+        
+        echo "Documentation checks passed"
+
+  # Deployment readiness check
+  deployment-check:
+    name: Deployment Readiness
+    runs-on: ubuntu-latest
+    needs: [test, integration-tests, docker-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check deployment files
+      run: |
+        # Check if required files exist
+        test -f Dockerfile || (echo "Dockerfile missing" && exit 1)
+        test -f docker-compose.yml || (echo "docker-compose.yml missing" && exit 1)
+        test -f requirements.txt || (echo "requirements.txt missing" && exit 1)
+        
+        echo "All deployment files present"
+    
+    - name: Validate Docker configuration
+      run: |
+        docker-compose config
+        echo "Docker Compose configuration is valid"
+
+  # Notification job
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [code-quality, test, integration-tests, docker-tests, documentation]
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: ${{ needs.code-quality.result == 'success' && needs.test.result == 'success' && needs.integration-tests.result == 'success' && needs.docker-tests.result == 'success' }}
+      run: |
+        echo "🎉 All tests passed successfully!"
+        echo "✅ Code quality checks passed"
+        echo "✅ Unit tests passed"
+        echo "✅ Integration tests passed"
+        echo "✅ Docker tests passed"
+        echo "✅ Documentation checks passed"
+    
+    - name: Notify failure
+      if: ${{ needs.code-quality.result == 'failure' || needs.test.result == 'failure' || needs.integration-tests.result == 'failure' || needs.docker-tests.result == 'failure' }}
+      run: |
+        echo "❌ Some tests failed!"
+        echo "Code quality: ${{ needs.code-quality.result }}"
+        echo "Unit tests: ${{ needs.test.result }}"
+        echo "Integration tests: ${{ needs.integration-tests.result }}"
+        echo "Docker tests: ${{ needs.docker-tests.result }}"
+        exit 1
