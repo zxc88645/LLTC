@@ -352,7 +352,22 @@ def cleanup_test_files():
         try:
             Path(coverage_file).unlink()
         except (OSError, FileNotFoundError):
-            pass
+for db_file in test_db_files:
+        try:
+            db_file.unlink()
+        except (OSError, PermissionError) as e:
+            logging.warning(f"Failed to delete test database file {db_file}: {e}")
+    
+    # Clean up coverage files if they exist
+    coverage_files = ['.coverage', 'coverage.xml']
+    for coverage_file in coverage_files:
+        try:
+            Path(coverage_file).unlink()
+        except (OSError, FileNotFoundError) as e:
+            logging.warning(f"Failed to delete coverage file {coverage_file}: {e}")
+
+
+# Performance testing utilities
 
 
 # Performance testing utilities
