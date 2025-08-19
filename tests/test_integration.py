@@ -194,7 +194,38 @@ class TestPersistenceWorkflow:
             name="Secure Machine", 
             host="secure.example.com",
             username="secureuser",
-            password="supersecret123"
+def test_password_encryption_persistence(self):
+        """Test that passwords remain encrypted when persisted."""
+        # Create machine manager
+        manager = MachineManager(config_dir=self.temp_dir)
+        
+        # Add machine with password
+        # Import os to use environment variables for secure password storage
+        import os
+        machine = MachineConfig(
+            id="secure-machine",
+            name="Secure Machine", 
+            host="secure.example.com",
+            username="secureuser",
+            password=os.getenv("SECURE_MACHINE_PASSWORD")
+        )
+        
+        manager.add_machine(machine)
+        
+        # Check that password is encrypted in storage
+        config_file = Path(self.temp_dir) / "machines.json"
+        assert config_file.exists()
+        
+        # Read raw file content
+        with open(config_file, 'r') as f:
+            content = f.read()
+        
+        # Password should not appear in plain text
+        assert "supersecret123" not in content
+        
+        # But should be decryptable when retrieved
+        retrieved = manager.get_machine("secure-machine")
+        assert retrieved.password == os.getenv("SECURE_MACHINE_PASSWORD")
         )
         
         manager.add_machine(machine)
