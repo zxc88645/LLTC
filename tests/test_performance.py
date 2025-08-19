@@ -66,8 +66,7 @@ class TestSessionManagementPerformance:
     def setup_method(self):
         """Setup test environment."""
         self.temp_dir = tempfile.mkdtemp()
-        self.agent = AIAgent()
-        self.agent.machine_manager = MachineManager(config_dir=self.temp_dir)
+        self.agent = AIAgent(config_dir=self.temp_dir)
     
     def teardown_method(self):
         """Cleanup test environment."""
@@ -188,8 +187,7 @@ class TestMemoryUsagePerformance:
     def setup_method(self):
         """Setup test environment."""
         self.temp_dir = tempfile.mkdtemp()
-        self.agent = AIAgent()
-        self.agent.machine_manager = MachineManager(config_dir=self.temp_dir)
+        self.agent = AIAgent(config_dir=self.temp_dir)
     
     def teardown_method(self):
         """Cleanup test environment."""
@@ -307,8 +305,7 @@ class TestLoadTesting:
     def setup_method(self):
         """Setup test environment."""
         self.temp_dir = tempfile.mkdtemp()
-        self.agent = AIAgent()
-        self.agent.machine_manager = MachineManager(config_dir=self.temp_dir)
+        self.agent = AIAgent(config_dir=self.temp_dir)
     
     def teardown_method(self):
         """Cleanup test environment."""

@@ -150,13 +150,8 @@ def command_interpreter() -> CommandInterpreter:
 @pytest.fixture
 def ai_agent(isolated_temp_dir: str) -> AIAgent:
     """Create an AI agent with isolated storage."""
-    with patch.object(AIAgent, '__init__', lambda self: None):
-        agent = AIAgent()
-        agent.machine_manager = MachineManager(config_dir=isolated_temp_dir)
-        agent.ssh_manager = SSHManager()
-        agent.command_interpreter = CommandInterpreter()
-        agent.sessions = {}
-        return agent
+    agent = AIAgent(config_dir=isolated_temp_dir)
+    return agent
 
 
 @pytest.fixture

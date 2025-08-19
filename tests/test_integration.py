@@ -18,9 +18,7 @@ class TestCompleteWorkflow:
     def setup_method(self):
         """Setup test environment."""
         self.temp_dir = tempfile.mkdtemp()
-        self.agent = AIAgent()
-        # Override the machine manager to use temp directory
-        self.agent.machine_manager = MachineManager(config_dir=self.temp_dir)
+        self.agent = AIAgent(config_dir=self.temp_dir)
     
     def teardown_method(self):
         """Cleanup test environment."""
@@ -164,8 +162,7 @@ class TestPersistenceWorkflow:
         mock_client.connect.return_value = None
         
         # Create first agent instance and add machine
-        agent1 = AIAgent()
-        agent1.machine_manager = MachineManager(config_dir=self.temp_dir)
+        agent1 = AIAgent(config_dir=self.temp_dir)
         
         machine_config = {
             "id": "persistent-machine",
@@ -179,8 +176,7 @@ class TestPersistenceWorkflow:
         assert result["success"] is True
         
         # Create second agent instance and verify machine exists
-        agent2 = AIAgent()
-        agent2.machine_manager = MachineManager(config_dir=self.temp_dir)
+        agent2 = AIAgent(config_dir=self.temp_dir)
         
         machines = agent2.list_machines()
         assert len(machines) == 1
@@ -227,8 +223,7 @@ class TestConcurrentOperations:
     def setup_method(self):
         """Setup test environment."""
         self.temp_dir = tempfile.mkdtemp()
-        self.agent = AIAgent()
-        self.agent.machine_manager = MachineManager(config_dir=self.temp_dir)
+        self.agent = AIAgent(config_dir=self.temp_dir)
     
     def teardown_method(self):
         """Cleanup test environment."""

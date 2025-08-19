@@ -53,7 +53,7 @@ jobs:
       continue-on-error: true
     
     - name: Upload security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-reports
@@ -190,7 +190,7 @@ jobs:
         cat memory_profile.txt
     
     - name: Upload performance reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-reports
         path: |
@@ -227,7 +227,7 @@ jobs:
       continue-on-error: true
     
     - name: Upload security test reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-test-reports
