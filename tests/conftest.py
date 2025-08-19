@@ -70,7 +70,29 @@ def temp_dir() -> Generator[str, None, None]:
     """Create a temporary directory for the test session."""
     temp_path = tempfile.mkdtemp(prefix="ssh_ai_test_")
     yield temp_path
-    shutil.rmtree(temp_path, ignore_errors=True)
+def temp_dir() -> Generator[str, None, None]:
+    """Create a temporary directory for the test session."""
+    temp_path = tempfile.mkdtemp(prefix="ssh_ai_test_")
+    yield temp_path
+    try:
+        shutil.rmtree(temp_path)
+    except OSError as e:
+        print(f"Error cleaning up temporary directory {temp_path}: {e}")
+
+
+@pytest.fixture
+def isolated_temp_dir() -> Generator[str, None, None]:
+    """Create an isolated temporary directory for each test."""
+    temp_path = tempfile.mkdtemp(prefix="ssh_ai_isolated_")
+    yield temp_path
+    try:
+        shutil.rmtree(temp_path)
+    except OSError as e:
+        print(f"Error cleaning up isolated temporary directory {temp_path}: {e}")
+
+
+@pytest.fixture
+def sample_machine() -> MachineConfig:
 
 
 @pytest.fixture
