@@ -314,26 +314,6 @@ class TestLoadTesting:
     def test_high_frequency_requests(self):
         """Test handling high frequency requests."""
         import concurrent.futures
-        
-        # Create session
-        session_id = self.agent.create_session()
-        
-        start_time = time.time()
-        
-        def make_request():
-            # Test various operations
-            operations = [
-                lambda: self.agent.create_session(),
-                lambda: self.agent.list_machines(),
-                lambda: self.agent.get_conversation_history(session_id),
-            ]
-            
-            for op in operations:
-                try:
-                    op()
-def test_high_frequency_requests(self):
-        """Test handling high frequency requests."""
-        import concurrent.futures
         import logging  # Import logging module for exception handling
         
         # Create session

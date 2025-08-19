@@ -27,7 +27,7 @@ class TestMachineManager:
             name="Test Machine",
             host="192.168.1.100",
             username="testuser",
-            password="testpass"
+            password="testpass",
         )
         
         success = self.manager.add_machine(machine)
@@ -46,7 +46,7 @@ class TestMachineManager:
             name="Secure Machine",
             host="secure.example.com",
             username="secureuser",
-            password="supersecret"
+            password="supersecret",
         )
         
         self.manager.add_machine(machine)
@@ -61,17 +61,11 @@ class TestMachineManager:
     def test_list_machines(self):
         """Test listing machines."""
         machine1 = MachineConfig(
-            id="machine1",
-            name="Machine 1",
-            host="host1.com",
-            username="user1"
+            id="machine1", name="Machine 1", host="host1.com", username="user1"
         )
         
         machine2 = MachineConfig(
-            id="machine2",
-            name="Machine 2",
-            host="host2.com",
-            username="user2"
+            id="machine2", name="Machine 2", host="host2.com", username="user2"
         )
         
         self.manager.add_machine(machine1)
@@ -90,16 +84,15 @@ class TestMachineManager:
             id="update-machine",
             name="Original Name",
             host="original.com",
-            username="user"
+            username="user",
         )
         
         self.manager.add_machine(machine)
         
         # Update machine
-        success = self.manager.update_machine("update-machine", {
-            "name": "Updated Name",
-            "host": "updated.com"
-        })
+        success = self.manager.update_machine(
+            "update-machine", {"name": "Updated Name", "host": "updated.com"}
+        )
         
         assert success is True
         
@@ -112,10 +105,7 @@ class TestMachineManager:
     def test_remove_machine(self):
         """Test removing a machine."""
         machine = MachineConfig(
-            id="remove-machine",
-            name="Remove Me",
-            host="remove.com",
-            username="user"
+            id="remove-machine", name="Remove Me", host="remove.com", username="user"
         )
         
         self.manager.add_machine(machine)
@@ -135,7 +125,7 @@ class TestMachineManager:
             name="Web Server",
             host="web.example.com",
             username="webuser",
-            description="Production web server"
+            description="Production web server",
         )
         
         machine2 = MachineConfig(
@@ -143,7 +133,7 @@ class TestMachineManager:
             name="Database Server",
             host="db.example.com",
             username="dbuser",
-            description="Production database"
+            description="Production database",
         )
         
         self.manager.add_machine(machine1)

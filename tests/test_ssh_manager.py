@@ -17,10 +17,10 @@ class TestSSHManager:
             name="Test Machine",
             host="test.example.com",
             username="testuser",
-            password="testpass"
+            password="testpass",
         )
     
-    @patch('src.ssh_manager.paramiko.SSHClient')
+    @patch("src.ssh_manager.paramiko.SSHClient")
     def test_execute_command_success(self, mock_ssh_client):
         """Test successful command execution."""
         # Mock SSH client and its methods
