@@ -3,6 +3,7 @@
 import os
 import tempfile
 import shutil
+import logging
 from pathlib import Path
 from typing import Generator, Dict, Any
 import pytest
@@ -70,10 +71,6 @@ def temp_dir() -> Generator[str, None, None]:
     """Create a temporary directory for the test session."""
     temp_path = tempfile.mkdtemp(prefix="ssh_ai_test_")
     yield temp_path
-def temp_dir() -> Generator[str, None, None]:
-    """Create a temporary directory for the test session."""
-    temp_path = tempfile.mkdtemp(prefix="ssh_ai_test_")
-    yield temp_path
     try:
         shutil.rmtree(temp_path)
     except OSError as e:
@@ -89,18 +86,6 @@ def isolated_temp_dir() -> Generator[str, None, None]:
         shutil.rmtree(temp_path)
     except OSError as e:
         print(f"Error cleaning up isolated temporary directory {temp_path}: {e}")
-
-
-@pytest.fixture
-def sample_machine() -> MachineConfig:
-
-
-@pytest.fixture
-def isolated_temp_dir() -> Generator[str, None, None]:
-    """Create an isolated temporary directory for each test."""
-    temp_path = tempfile.mkdtemp(prefix="ssh_ai_isolated_")
-    yield temp_path
-    shutil.rmtree(temp_path, ignore_errors=True)
 
 
 @pytest.fixture
@@ -194,13 +179,8 @@ def mock_ssh_client():
         
         mock_stdout.read.return_value = b"test output\n"
         mock_stderr.read.return_value = b""
-mock_stdout.read.return_value = b"test output
-"
-        mock_stderr.read.return_value = b""
         mock_stdout.channel = Mock()
         mock_stdout.channel.recv_exit_status.return_value = 0
-        
-        mock_instance.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
         
         mock_instance.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
         
@@ -304,33 +284,18 @@ def pytest_collection_modifyitems(config, items):
         
         # Add slow marker to tests that might be slow
         if any(keyword in item.name.lower() 
-               for keyword in ['connection', 'ssh', 'network', 'database']):
+               for keyword in ['connection', 'ssh', 'network', 'database', 'long_running', 'time_consuming', 'heavy_computation']):
             item.add_marker(pytest.mark.slow)
         
         # Add ssh marker to SSH-related tests
         if any(keyword in item.name.lower() 
-               for keyword in ['ssh', 'connection', 'execute_command']):
+               for keyword in ['ssh', 'connection', 'execute_command', 'remote_execution', 'secure_shell']):
             item.add_marker(pytest.mark.ssh)
         
         # Add database marker to database-related tests
         if any(keyword in item.name.lower() 
-               for keyword in ['database', 'db', 'storage', 'persistence']):
-# Add slow marker to tests that might be slow
-        if any(keyword in item.name.lower() 
-               for keyword in ['long_running', 'time_consuming', 'heavy_computation']):
-            item.add_marker(pytest.mark.slow)
-        
-        # Add ssh marker to SSH-related tests
-        if any(keyword in item.name.lower() 
-               for keyword in ['ssh', 'remote_execution', 'secure_shell']):
-            item.add_marker(pytest.mark.ssh)
-        
-        # Add database marker to database-related tests
-        if any(keyword in item.name.lower() 
-               for keyword in ['db', 'sql', 'nosql', 'orm']):
+               for keyword in ['database', 'db', 'storage', 'persistence', 'sql', 'nosql', 'orm']):
             item.add_marker(pytest.mark.database)
-        
-        # Add web marker to web-related tests
         
         # Add web marker to web-related tests
         if any(keyword in item.name.lower() 
@@ -349,18 +314,6 @@ def cleanup_test_files():
     for db_file in test_db_files:
         try:
             db_file.unlink()
-        except (OSError, PermissionError):
-            pass
-    
-    # Clean up coverage files if they exist
-    coverage_files = ['.coverage', 'coverage.xml']
-    for coverage_file in coverage_files:
-        try:
-            Path(coverage_file).unlink()
-        except (OSError, FileNotFoundError):
-for db_file in test_db_files:
-        try:
-            db_file.unlink()
         except (OSError, PermissionError) as e:
             logging.warning(f"Failed to delete test database file {db_file}: {e}")
     
@@ -371,9 +324,6 @@ for db_file in test_db_files:
             Path(coverage_file).unlink()
         except (OSError, FileNotFoundError) as e:
             logging.warning(f"Failed to delete coverage file {coverage_file}: {e}")
-
-
-# Performance testing utilities
 
 
 # Performance testing utilities
@@ -396,15 +346,6 @@ def performance_monitor():
             self.start_time = time.time()
             self.monitoring = True
             self.monitor_thread = threading.Thread(target=self._monitor_memory)
-            self.monitor_thread.start()
-        
-        def stop(self):
-            self.end_time = time.time()
-            self.monitoring = False
-            if self.monitor_thread:
-self.start_time = time.time()
-            self.monitoring = True
-            self.monitor_thread = threading.Thread(target=self._monitor_memory)
             self.monitor_thread.daemon = True
             self.monitor_thread.start()
         
@@ -413,9 +354,6 @@ self.start_time = time.time()
             self.monitoring = False
             if self.monitor_thread:
                 self.monitor_thread.join(timeout=1.0)
-        
-        def _monitor_memory(self):
-            process = psutil.Process()
         
         def _monitor_memory(self):
             process = psutil.Process()
@@ -451,17 +389,10 @@ def security_tester():
         @staticmethod
         def is_password_encrypted(password_data: str) -> bool:
             """Check if password appears to be encrypted."""
-            # Basic check - encrypted passwords should not be readable text
-@staticmethod
-        def is_password_encrypted(password_data: str) -> bool:
-            """Check if password appears to be encrypted."""
             # TODO: Implement proper encryption detection logic
             # This could involve checking for base64 patterns, common hash formats,
             # or performing entropy analysis on the password data
             return False
-        
-        @staticmethod
-        def check_file_permissions(file_path: Path) -> bool:
         
         @staticmethod
         def check_file_permissions(file_path: Path) -> bool:
