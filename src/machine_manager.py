@@ -3,16 +3,26 @@
 from typing import List, Optional, Dict
 from pathlib import Path
 
+import os
+
 from .models import MachineConfig
 from .db_service import DatabaseService
+from .database import init_database
 
 
 class MachineManager:
     """Manages SSH machine configurations using SQLite database."""
     
     def __init__(self, config_dir: str = "config"):
+def __init__(self, config_dir: str = "config"):
+        # import os
+        # Use os.path.join for safe path construction
+        os.environ["DATABASE_DIR"] = os.path.join(os.getcwd(), config_dir)
+        init_database()
         self.db_service = DatabaseService(config_dir)
-        
+        init_database()
+        self.db_service = DatabaseService(config_dir)
+
         # Migrate from JSON if exists
         self._migrate_from_json(config_dir)
     
